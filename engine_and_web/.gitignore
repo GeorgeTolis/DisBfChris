@@ -1,0 +1,4 @@
+objects/
+bin
+web_build/*
+!web_build/index.html
