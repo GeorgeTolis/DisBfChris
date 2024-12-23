@@ -21,7 +21,7 @@ static struct
     Mix_Chunk *gem_sfx;
     TTF_Font *main_font;
 
-    ng_sprite_t player;
+    ng_animated_sprite_t player;
     ng_label_t welcome_text;
     ng_animated_sprite_t explosion;
 } ctx;
@@ -31,14 +31,14 @@ static void create_actors(void)
     ng_game_create(&ctx.game, "Hello World!", WIDTH, HEIGHT);
 
     ctx.main_font = TTF_OpenFont("res/free_mono.ttf", 16);
-    ctx.player_texture = IMG_LoadTexture(ctx.game.renderer, "res/player.png");
+    ctx.player_texture = IMG_LoadTexture(ctx.game.renderer, "res/user_player.png");
     ctx.explosion_texture = IMG_LoadTexture(ctx.game.renderer, "res/explosion.png");
     ctx.gem_sfx = ng_audio_load("res/gem.wav");
 
     ng_interval_create(&ctx.game_tick, 50);
-    ng_sprite_create(&ctx.player, ctx.player_texture);
-    ng_sprite_set_scale(&ctx.player, 2.0f);
-    ctx.player.transform.y = HEIGHT - ctx.player.transform.h - 10;
+    ng_animated_create(&ctx.player, ctx.player_texture, 3);
+    ng_sprite_set_scale(&ctx.player.sprite, 2.0f);
+    ctx.player.sprite.transform.y = HEIGHT - ctx.player.sprite.transform.h - 10;
 
     ng_animated_create(&ctx.explosion, ctx.explosion_texture, 9);
     ng_sprite_set_scale(&ctx.explosion.sprite, 2.0f);
@@ -76,18 +76,25 @@ static void update_and_render_scene(float delta)
 {
     // Handling "continuous" events, which are now repeatable
     const Uint8* keys = SDL_GetKeyboardState(NULL);
+    bool movement_input = false;
 
-    if (keys[SDL_SCANCODE_LEFT]) ctx.player.transform.x -= 640* delta;
-    if (keys[SDL_SCANCODE_RIGHT]) ctx.player.transform.x += 640* delta;
+    if (keys[SDL_SCANCODE_LEFT]){
+        ctx.player.sprite.transform.x -= 640* delta;
+        movement_input = true;
+    }
+    if (keys[SDL_SCANCODE_RIGHT]){
+        ctx.player.sprite.transform.x += 640* delta;
+        movement_input = true;
+    }
 
     // Update the explosion's frame once every 100ms
     if (ng_interval_is_ready(&ctx.game_tick))
     {
-        ng_animated_set_frame(&ctx.explosion, (ctx.explosion.frame + 1)
-                % ctx.explosion.total_frames);
+        ng_animated_set_frame(&ctx.explosion, (ctx.explosion.frame + 1) % ctx.explosion.total_frames);
+        if (movement_input) ng_animated_set_frame(&ctx.player, (ctx.player.frame + 1) % ctx.player.total_frames);
     }
 
-    ng_sprite_render(&ctx.player, ctx.game.renderer);
+    ng_sprite_render(&ctx.player.sprite, ctx.game.renderer);
     ng_sprite_render(&ctx.explosion.sprite, ctx.game.renderer);
     ng_sprite_render(&ctx.welcome_text.sprite, ctx.game.renderer);
 }
@@ -95,6 +102,6 @@ static void update_and_render_scene(float delta)
 int main()
 {
     create_actors();
-    ng_game_start_loop(&ctx.game,
-            handle_event, update_and_render_scene);
+    ng_game_start_loop(&ctx.game, handle_event, update_and_render_scene);
+    return 0;
 }
