@@ -261,6 +261,8 @@ static void update_correct_screen(float delta){
         player_n_enemy_movement(delta);
         points_check();
         break; 
+    default:
+        break;
     }  
 }
 
@@ -274,7 +276,9 @@ static void render_correct_screen(){
         break;
     case PENGUIN_CHASE:
         render_penguin_scene();
-        break; 
+        break;
+    default:
+        break;
     }    
 }
 
