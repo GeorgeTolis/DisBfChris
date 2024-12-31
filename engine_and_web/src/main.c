@@ -23,14 +23,15 @@ static struct
     // A collection of assets used by entities
     // Ideally, they should have been automatically loaded
     // by iterating over the res/ folder and filling in a hastable
-    SDL_Texture *player_texture, *penguin_texture, *present_texture, *home_background_texture;
+    SDL_Texture *player_texture, *penguin_texture, *present_texture, *home_bg_texture, *penguin_bg_texture;
     TTF_Font *main_font;
 
     Scene current_scene;
     ng_label_t welcome_label;
     ng_sprite_t home_bg;
     ng_label_t penguin_context_label;
-    
+
+    ng_sprite_t penguin_bg;
 
     ng_animated_sprite_t player;
     ng_animated_sprite_t penguins[3];
@@ -51,25 +52,29 @@ static void create_actors(void){
     ctx.player_texture = IMG_LoadTexture(ctx.game.renderer, "res/elf_sprite.png");
     ctx.penguin_texture = IMG_LoadTexture(ctx.game.renderer, "res/penquin.png");
     ctx.present_texture = IMG_LoadTexture(ctx.game.renderer, "res/present.png");
-    ctx.home_background_texture = IMG_LoadTexture(ctx.game.renderer, "res/home_background.png");
+    ctx.home_bg_texture = IMG_LoadTexture(ctx.game.renderer, "res/home_background.png");
+    ctx.penguin_bg_texture = IMG_LoadTexture(ctx.game.renderer, "res/penguin_background.png");
 
     ng_interval_create(&ctx.game_tick, 50);
 
     ctx.current_scene = HOMESCREEN;
-    ng_sprite_create(&ctx.home_bg, ctx.home_background_texture);
+    ng_sprite_create(&ctx.home_bg, ctx.home_bg_texture);
     ng_sprite_set_scale(&ctx.home_bg, 2.9f);
     ctx.home_bg.transform.x = -200;
+
+    ng_sprite_create(&ctx.penguin_bg, ctx.penguin_bg_texture);
+    ng_sprite_set_scale(&ctx.penguin_bg, 5.0f);
 
     ng_animated_create(&ctx.player, ctx.player_texture, 3);
     ng_sprite_set_scale(&ctx.player.sprite, 4.0f);
     ctx.player.sprite.transform.x = (WIDTH - ctx.player.sprite.transform.w - 10)/2;
-    ctx.player.sprite.transform.y = HEIGHT - ctx.player.sprite.transform.h - 10;
+    ctx.player.sprite.transform.y = HEIGHT - ctx.player.sprite.transform.h - 30;
 
     for (size_t i = 0; i < 3; i++){
         ng_animated_create(&ctx.penguins[i], ctx.penguin_texture, 2);
         ng_sprite_set_scale(&ctx.penguins[i].sprite, 3.0f);
         ctx.penguins[i].sprite.transform.x = (WIDTH - ctx.penguins[i].sprite.transform.w - 10) / 3.0 * (i) + 50;
-        ctx.penguins[i].sprite.transform.y = 30;
+        ctx.penguins[i].sprite.transform.y = 55;
         ctx.penguin_velocity[i] = pow(-1, i) * 120 * (i+1);
     }
     ng_animated_set_frame(&ctx.penguins[1], (ctx.penguins[1].frame + 1) % ctx.penguins[1].total_frames);
@@ -139,7 +144,7 @@ static void player_n_enemy_movement(float delta){
     }
 
     // Moving penguins back and forth
-    ng_vec2 left = { 10 , 10 }, right = { WIDTH - 100, 10 };
+    ng_vec2 left = { 10 , 50 }, right = { WIDTH - 100, 50 };
     ng_vec2 left_bound, right_bound;
     float left_threshold, right_threshold, threshold = 30;
 
@@ -194,7 +199,7 @@ static void player_n_enemy_movement(float delta){
 }
 
 static void points_check(){
-    ng_vec2 player_pos = { ctx.player.sprite.transform.x, ctx.player.sprite.transform.y };
+    ng_vec2 player_pos = { ctx.player.sprite.transform.x + ctx.player.sprite.transform.w/2, ctx.player.sprite.transform.y + ctx.player.sprite.transform.h/2 };
     ng_vec2 player_present_dist;
     float distance;
     for (size_t i = 0; i < 10; i++){
@@ -204,7 +209,7 @@ static void points_check(){
         ng_vectors_substract(&player_present_dist, &player_pos, &pres_pos);
         distance = ng_vector_get_magnitude(&player_present_dist);
         
-        if (distance < 50){
+        if (distance < 110){
             ctx.score++;
             ctx.presents[i].transform.y += HEIGHT;
         }
@@ -232,6 +237,7 @@ static void render_home_to_penguin_scene(){
 }
 
 static void render_penguin_scene(){
+    ng_sprite_render(&ctx.penguin_bg, ctx.game.renderer);
     ng_sprite_render(&ctx.player.sprite, ctx.game.renderer);
     for (size_t i = 0; i < 3; i++){
         ng_sprite_render(&ctx.penguins[i].sprite, ctx.game.renderer);    
