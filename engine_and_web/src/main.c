@@ -11,7 +11,9 @@
 #define WIDTH 1280
 #define HEIGHT 640*1.4
 
-#define PRESENT_V 80
+#define PRESENT_V 120
+
+typedef enum { HOMESCREEN, CONTEXT_SCENE, PENGUIN_CHASE, OTHER } Scene;
 
 static struct
 {
@@ -21,9 +23,14 @@ static struct
     // A collection of assets used by entities
     // Ideally, they should have been automatically loaded
     // by iterating over the res/ folder and filling in a hastable
-    SDL_Texture *player_texture, *penguin_texture, *present_texture;
-    Mix_Chunk *gem_sfx;
+    SDL_Texture *player_texture, *penguin_texture, *present_texture, *home_background_texture;
     TTF_Font *main_font;
+
+    Scene current_scene;
+    ng_label_t welcome_label;
+    ng_sprite_t home_bg;
+    ng_label_t penguin_context_label;
+    
 
     ng_animated_sprite_t player;
     ng_animated_sprite_t penguins[3];
@@ -33,21 +40,25 @@ static struct
     short int max_present_countdown;
 
     ng_sprite_t presents[10];
-    unsigned int score;
+    short int score;
     ng_label_t score_label;
 } ctx;
 
-static void create_actors(void)
-{
-    ng_game_create(&ctx.game, "Elf Life", WIDTH, HEIGHT);
+static void create_actors(void){
+    ng_game_create(&ctx.game, "DISASTER BEFORE CHRISTMAS", WIDTH, HEIGHT);
 
     ctx.main_font = TTF_OpenFont("res/free_mono.ttf", 16);
     ctx.player_texture = IMG_LoadTexture(ctx.game.renderer, "res/elf_sprite.png");
     ctx.penguin_texture = IMG_LoadTexture(ctx.game.renderer, "res/penquin.png");
     ctx.present_texture = IMG_LoadTexture(ctx.game.renderer, "res/present.png");
-    ctx.gem_sfx = ng_audio_load("res/gem.wav");
+    ctx.home_background_texture = IMG_LoadTexture(ctx.game.renderer, "res/home_background.png");
 
     ng_interval_create(&ctx.game_tick, 50);
+
+    ctx.current_scene = HOMESCREEN;
+    ng_sprite_create(&ctx.home_bg, ctx.home_background_texture);
+    ng_sprite_set_scale(&ctx.home_bg, 2.9f);
+    ctx.home_bg.transform.x = -200;
 
     ng_animated_create(&ctx.player, ctx.player_texture, 3);
     ng_sprite_set_scale(&ctx.player.sprite, 4.0f);
@@ -72,6 +83,21 @@ static void create_actors(void)
     }
     ctx.max_present_countdown = ctx.present_countdown = 30;
 
+    ng_label_create(&ctx.welcome_label, ctx.main_font, 300);
+    ng_label_set_content(&ctx.welcome_label, ctx.game.renderer, "DISASTER BEFORE CHRISTMAS\n  PRESS [SPACE] TO PLAY");
+    ng_sprite_set_scale(&ctx.welcome_label.sprite, 3.0f);
+    ctx.welcome_label.sprite.transform.x = WIDTH/2 - ctx.welcome_label.sprite.transform.w/2 + 110;
+    ctx.welcome_label.sprite.transform.y = HEIGHT/4 - 15;
+
+    ng_label_create(&ctx.penguin_context_label, ctx.main_font, 400);
+    ng_label_set_content(&ctx.penguin_context_label, ctx.game.renderer, "You are a hard working elf\nlike no other, but at\n"
+                                                                        "Christmas Eve, some pesky\npenguins stole Santa's presents.\n\n"
+                                                                        "Your job now is to try and\ncollect the presents that fall\n"
+                                                                        "from the penguins and load\nSanta's slay before he notices.");
+    ng_sprite_set_scale(&ctx.penguin_context_label.sprite, 2.0f);
+    ctx.penguin_context_label.sprite.transform.x = WIDTH/2 - ctx.penguin_context_label.sprite.transform.w/2 + 35;
+    ctx.penguin_context_label.sprite.transform.y = HEIGHT/4 - 15;
+
     ng_label_create(&ctx.score_label, ctx.main_font, 300);
     ng_label_set_content(&ctx.score_label, ctx.game.renderer, "SCORE: ");
     ctx.score_label.sprite.transform.x = 10;
@@ -83,11 +109,19 @@ static void handle_event(SDL_Event *event)
 {
     switch (event->type)
     {
+    case SDL_KEYDOWN:
+        // Press space to start!
+        if (event->key.keysym.sym == SDLK_SPACE && ctx.current_scene == HOMESCREEN){
+            ctx.current_scene = CONTEXT_SCENE;
+            ctx.score = 200;
+        }
+
+        break;
     case SDL_MOUSEMOTION:
         // Move label on mouse position
         // By the way, that's how you can implement a custom cursor
-        //ctx.score_label.sprite.transform.x = event->motion.x;
-        //ctx.score_label.sprite.transform.y = event->motion.y;
+        //ctx.aaa.sprite.transform.x = event->motion.x;
+        //ctx.aaa.sprite.transform.y = event->motion.y;
         break;
     }
 }
@@ -135,8 +169,6 @@ static void player_n_enemy_movement(float delta){
             if (ctx.max_present_countdown > 10) ctx.max_present_countdown--;
             spawn_present = true;
         }
-        //ng_animated_set_frame(&ctx.explosion, (ctx.explosion.frame + 1) % ctx.explosion.total_frames);
-        //if (movement_input) ng_animated_set_frame(&ctx.player, (ctx.player.frame + 1) % ctx.player.total_frames);
     }
 
     // Spawn present if needed
@@ -172,14 +204,34 @@ static void points_check(){
         ng_vectors_substract(&player_present_dist, &player_pos, &pres_pos);
         distance = ng_vector_get_magnitude(&player_present_dist);
         
-        if (distance < 30){
+        if (distance < 50){
             ctx.score++;
             ctx.presents[i].transform.y += HEIGHT;
         }
     }
 }
 
-static void render_scene(){
+static void update_home_to_penguin_scene(){
+    if (ng_interval_is_ready(&ctx.game_tick)){
+        ctx.score--;
+
+        if (ctx.score <= 0){
+            ctx.current_scene = PENGUIN_CHASE;
+            ctx.score = 0;
+        }
+    }
+}
+
+static void render_home_scene(){
+    ng_sprite_render(&ctx.home_bg, ctx.game.renderer);
+    ng_sprite_render(&ctx.welcome_label.sprite, ctx.game.renderer);
+}
+
+static void render_home_to_penguin_scene(){
+    ng_sprite_render(&ctx.penguin_context_label.sprite, ctx.game.renderer);
+}
+
+static void render_penguin_scene(){
     ng_sprite_render(&ctx.player.sprite, ctx.game.renderer);
     for (size_t i = 0; i < 3; i++){
         ng_sprite_render(&ctx.penguins[i].sprite, ctx.game.renderer);    
@@ -192,13 +244,37 @@ static void render_scene(){
     ng_sprite_render(&ctx.score_label.sprite, ctx.game.renderer);
 }
 
-static void update_and_render_scene(float delta){
-    
-    // Moving charaters in the scene
-    player_n_enemy_movement(delta);
-    points_check();
+static void update_correct_screen(float delta){
+    switch (ctx.current_scene){
+    case HOMESCREEN:
+        break;
+    case CONTEXT_SCENE:
+        update_home_to_penguin_scene();
+        break;
+    case PENGUIN_CHASE:
+        player_n_enemy_movement(delta);
+        points_check();
+        break; 
+    }  
+}
 
-    render_scene();
+static void render_correct_screen(){
+    switch (ctx.current_scene){
+    case HOMESCREEN:
+        render_home_scene();
+        break;
+    case CONTEXT_SCENE:
+        render_home_to_penguin_scene();
+        break;
+    case PENGUIN_CHASE:
+        render_penguin_scene();
+        break; 
+    }    
+}
+
+static void update_and_render_scene(float delta){
+    update_correct_screen(delta);
+    render_correct_screen();
 }
 
 int main(){
