@@ -26,12 +26,15 @@ static struct
     TTF_Font *main_font;
 
     ng_animated_sprite_t player;
-    ng_sprite_t presents[10];
-    //ng_label_t welcome_text;
     ng_animated_sprite_t penguins[3];
     short int penguin_velocity[3];
+
     short int present_countdown;
     short int max_present_countdown;
+
+    ng_sprite_t presents[10];
+    unsigned int score;
+    ng_label_t score_label;
 } ctx;
 
 static void create_actors(void)
@@ -64,16 +67,15 @@ static void create_actors(void)
     for (size_t i = 0; i < 10; i++){
         ng_sprite_create(&ctx.presents[i], ctx.present_texture);
         ng_sprite_set_scale(&ctx.presents[i], 3.0f);
-        ctx.presents[i].transform.x = -100;//WIDTH/2.0;
-        ctx.presents[i].transform.y = -100;//HEIGHT/2.0;
+        ctx.presents[i].transform.x = -100;
+        ctx.presents[i].transform.y = -100;
     }
     ctx.max_present_countdown = ctx.present_countdown = 30;
 
-    /*ng_label_create(&ctx.welcome_text, ctx.main_font, 300);
-    ng_label_set_content(&ctx.welcome_text, ctx.game.renderer,
-            "I don't really know what to write in here. "
-            "You'll notice that you can't type Greek. To do that, "
-            "just replace the internals with TTF_RenderUTF8_Solid");*/
+    ng_label_create(&ctx.score_label, ctx.main_font, 300);
+    ng_label_set_content(&ctx.score_label, ctx.game.renderer, "SCORE: ");
+    ctx.score_label.sprite.transform.x = 10;
+    ctx.score_label.sprite.transform.y = 150;
 }
 
 // A place to handle queued events.
@@ -81,18 +83,11 @@ static void handle_event(SDL_Event *event)
 {
     switch (event->type)
     {
-    case SDL_KEYDOWN:
-        // Press space for a sound effect!
-        //if (event->key.keysym.sym == SDLK_SPACE)
-        //    ng_audio_play(ctx.gem_sfx);
-
-        break;
-
     case SDL_MOUSEMOTION:
         // Move label on mouse position
         // By the way, that's how you can implement a custom cursor
-        //ctx.welcome_text.sprite.transform.x = event->motion.x;
-        //ctx.welcome_text.sprite.transform.y = event->motion.y;
+        //ctx.score_label.sprite.transform.x = event->motion.x;
+        //ctx.score_label.sprite.transform.y = event->motion.y;
         break;
     }
 }
@@ -166,12 +161,25 @@ static void player_n_enemy_movement(float delta){
     }
 }
 
-static void update_and_render_scene(float delta)
-{
-    
-    // Moving charaters in the scene
-    player_n_enemy_movement(delta);
+static void points_check(){
+    ng_vec2 player_pos = { ctx.player.sprite.transform.x, ctx.player.sprite.transform.y };
+    ng_vec2 player_present_dist;
+    float distance;
+    for (size_t i = 0; i < 10; i++){
+        if (ctx.presents[i].transform.y < 0 || ctx.presents[i].transform.y > HEIGHT) continue;
 
+        ng_vec2 pres_pos = { ctx.presents[i].transform.x, ctx.presents[i].transform.y };
+        ng_vectors_substract(&player_present_dist, &player_pos, &pres_pos);
+        distance = ng_vector_get_magnitude(&player_present_dist);
+        
+        if (distance < 30){
+            ctx.score++;
+            ctx.presents[i].transform.y += HEIGHT;
+        }
+    }
+}
+
+static void render_scene(){
     ng_sprite_render(&ctx.player.sprite, ctx.game.renderer);
     for (size_t i = 0; i < 3; i++){
         ng_sprite_render(&ctx.penguins[i].sprite, ctx.game.renderer);    
@@ -181,11 +189,19 @@ static void update_and_render_scene(float delta)
 
         ng_sprite_render(&ctx.presents[i], ctx.game.renderer);
     }
-    //ng_sprite_render(&ctx.welcome_text.sprite, ctx.game.renderer);
+    ng_sprite_render(&ctx.score_label.sprite, ctx.game.renderer);
 }
 
-int main()
-{
+static void update_and_render_scene(float delta){
+    
+    // Moving charaters in the scene
+    player_n_enemy_movement(delta);
+    points_check();
+
+    render_scene();
+}
+
+int main(){
     create_actors();
     ng_game_start_loop(&ctx.game, handle_event, update_and_render_scene);
     return 0;
