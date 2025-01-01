@@ -12,6 +12,7 @@
 #define HEIGHT 640*1.4
 
 #define PRESENT_V 120
+#define MAX_VERT_V 960
 
 typedef enum { HOMESCREEN, CONTEXT_SCENE, PENGUIN_CHASE, PENG_TO_SLEIGH, SLEIGH, WIN, LOSE } Scene;
 
@@ -49,7 +50,11 @@ static struct
     ng_sprite_t sleigh_bg;
     ng_animated_sprite_t sleigh;
     bool carrying_present;
+    short unsigned int top_present;
     int santa_countdown;
+    int vertical_velocity;
+    bool is_jumping;
+    int floor;
 } ctx;
 
 static void create_actors(void){
@@ -68,6 +73,10 @@ static void create_actors(void){
 
     ctx.current_scene = HOMESCREEN;
     ctx.carrying_present = false;
+    ctx.top_present = 9;
+    ctx.vertical_velocity = 0;
+    ctx.is_jumping = false;
+
     ng_sprite_create(&ctx.home_bg, ctx.home_bg_texture);
     ng_sprite_set_scale(&ctx.home_bg, 2.9f);
     ctx.home_bg.transform.x = -200;
@@ -87,6 +96,7 @@ static void create_actors(void){
     ng_sprite_set_scale(&ctx.player.sprite, 4.0f);
     ctx.player.sprite.transform.x = (WIDTH - ctx.player.sprite.transform.w - 10)/2;
     ctx.player.sprite.transform.y = HEIGHT - ctx.player.sprite.transform.h - 30;
+    ctx.floor = ctx.player.sprite.transform.y;
 
     for (size_t i = 0; i < 3; i++){
         ng_animated_create(&ctx.penguins[i], ctx.penguin_texture, 2);
@@ -163,6 +173,19 @@ static void player_n_enemy_movement(float delta){
     }
     if (keys[SDL_SCANCODE_RIGHT]){
         ctx.player.sprite.transform.x += 640* delta;
+    }
+    if (keys[SDL_SCANCODE_SPACE] && !ctx.is_jumping){
+        ctx.vertical_velocity = 960;
+        ctx.is_jumping = true;
+    }
+
+    if (ctx.is_jumping){
+        ctx.player.sprite.transform.y -= ctx.vertical_velocity * delta;
+        ctx.vertical_velocity -= 40;
+        if (ctx.player.sprite.transform.y > ctx.floor){
+            ctx.player.sprite.transform.y = ctx.floor;
+            ctx.is_jumping = false;
+        }
     }
 
     // Moving penguins back and forth
@@ -242,7 +265,8 @@ static void points_check(){
             ng_animated_set_frame(&ctx.player, 1);
 
             ctx.player.sprite.transform.x = WIDTH - 300;
-            ctx.player.sprite.transform.y = ctx.sleigh.sprite.transform.y + ctx.player.sprite.transform.h - 20;
+            ctx.player.sprite.transform.y = ctx.sleigh.sprite.transform.y + ctx.player.sprite.transform.h - 15;
+            ctx.floor = ctx.player.sprite.transform.y;
 
             for (i = 0; i < 10; i++){
                 ctx.presents[i].transform.x = ctx.player.sprite.transform.x + 50;
@@ -285,12 +309,53 @@ static void update_sleigh_scene(float delta){
         ctx.player.sprite.transform.x += 640* delta;
         ng_animated_set_frame(&ctx.player, 2);
     }
+    if (keys[SDL_SCANCODE_SPACE] && !ctx.is_jumping){
+        ctx.vertical_velocity = 960;
+        ctx.is_jumping = true;
+    }
+
+    if (ctx.is_jumping){
+        ctx.player.sprite.transform.y -= ctx.vertical_velocity * delta;
+        ctx.vertical_velocity -= 40;
+        if (ctx.player.sprite.transform.y > ctx.floor){
+            ctx.player.sprite.transform.y = ctx.floor;
+            ctx.is_jumping = false;
+        }
+    }
+
+    //ctx.sleigh.sprite.transform.y + ctx.player.sprite.transform.h - 15
 
     if (ctx.carrying_present){
         ng_animated_set_frame(&ctx.player, 0);
     }
 
+    if (ctx.presents[0].transform.x < 0 && !ctx.carrying_present){
+        ctx.current_scene = WIN;
+    }
 
+    ng_vec2 player_pos = { ctx.player.sprite.transform.x + ctx.player.sprite.transform.w/2, ctx.player.sprite.transform.y + ctx.player.sprite.transform.h/2 };
+    ng_vec2 pres_pos = { ctx.presents[0].transform.x, ctx.presents[0].transform.y };
+    ng_vec2 player_target_dist;
+
+    ng_vectors_substract(&player_target_dist, &player_pos, &pres_pos);
+    float distance = ng_vector_get_magnitude(&player_target_dist);
+    if (distance < 20 && !ctx.carrying_present){
+        ctx.presents[ctx.top_present].transform.x = -100;
+        ctx.top_present--;
+        ctx.carrying_present = true;
+    }
+
+    ng_vec2 sleigh_pos = { ctx.sleigh.sprite.transform.x + ctx.sleigh.sprite.transform.w/2, ctx.sleigh.sprite.transform.y + ctx.sleigh.sprite.transform.h/2 };
+    
+    ng_vectors_substract(&player_target_dist, &player_pos, &sleigh_pos);
+    distance = ng_vector_get_magnitude(&player_target_dist);
+    if (distance < 80 && ctx.carrying_present){
+        if (ctx.top_present == 8 || ctx.top_present == 5 || ctx.top_present == 1){
+            ng_animated_set_frame(&ctx.sleigh, (ctx.sleigh.frame + 1) % ctx.sleigh.total_frames);
+        }
+
+        ctx.carrying_present = false;
+    }
 }
 
 static void render_home_scene(){
