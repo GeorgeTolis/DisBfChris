@@ -13,7 +13,7 @@
 
 #define PRESENT_V 120
 
-typedef enum { HOMESCREEN, CONTEXT_SCENE, PENGUIN_CHASE, OTHER } Scene;
+typedef enum { HOMESCREEN, CONTEXT_SCENE, PENGUIN_CHASE, PENG_TO_SLEIGH, SLEIGH, WIN, LOSE } Scene;
 
 static struct
 {
@@ -23,7 +23,7 @@ static struct
     // A collection of assets used by entities
     // Ideally, they should have been automatically loaded
     // by iterating over the res/ folder and filling in a hastable
-    SDL_Texture *player_texture, *penguin_texture, *present_texture, *home_bg_texture, *penguin_bg_texture;
+    SDL_Texture *player_texture, *penguin_texture, *present_texture, *home_bg_texture, *penguin_bg_texture, *sleigh_bg_texture;
     TTF_Font *main_font;
 
     Scene current_scene;
@@ -43,6 +43,12 @@ static struct
     ng_sprite_t presents[10];
     short int score;
     ng_label_t score_label;
+
+    ng_label_t peng_to_sleigh_label;
+
+    ng_sprite_t sleigh_bg;
+    ng_animated_sprite_t sleigh;
+
 } ctx;
 
 static void create_actors(void){
@@ -54,6 +60,7 @@ static void create_actors(void){
     ctx.present_texture = IMG_LoadTexture(ctx.game.renderer, "res/present.png");
     ctx.home_bg_texture = IMG_LoadTexture(ctx.game.renderer, "res/home_background.png");
     ctx.penguin_bg_texture = IMG_LoadTexture(ctx.game.renderer, "res/penguin_background.png");
+    ctx.home_bg_texture = IMG_LoadTexture(ctx.game.renderer, "res/home_background.png");
 
     ng_interval_create(&ctx.game_tick, 50);
 
@@ -98,27 +105,32 @@ static void create_actors(void){
     ng_label_set_content(&ctx.penguin_context_label, ctx.game.renderer, "You are a hard working elf\nlike no other, but at\n"
                                                                         "Christmas Eve, some pesky\npenguins stole Santa's presents.\n\n"
                                                                         "Your job now is to try and\ncollect the presents that fall\n"
-                                                                        "from the penguins and load\nSanta's slay before he notices.");
+                                                                        "from the penguins and load\nSanta's sleigh before he notices.");
     ng_sprite_set_scale(&ctx.penguin_context_label.sprite, 2.0f);
     ctx.penguin_context_label.sprite.transform.x = WIDTH/2 - ctx.penguin_context_label.sprite.transform.w/2 + 35;
     ctx.penguin_context_label.sprite.transform.y = HEIGHT/4 - 15;
 
     ng_label_create(&ctx.score_label, ctx.main_font, 300);
-    ng_label_set_content(&ctx.score_label, ctx.game.renderer, "SCORE: ");
+    ng_label_set_content(&ctx.score_label, ctx.game.renderer, "SCORE: 0");
     ctx.score_label.sprite.transform.x = 10;
     ctx.score_label.sprite.transform.y = 150;
+
+    ng_label_create(&ctx.peng_to_sleigh_label, ctx.main_font, 300);
+    ng_label_set_content(&ctx.peng_to_sleigh_label, ctx.game.renderer, "LOAD THE PRESENTS");
+    ng_sprite_set_scale(&ctx.peng_to_sleigh_label.sprite, 4.0f);
+    ctx.peng_to_sleigh_label.sprite.transform.x = WIDTH/2 - ctx.penguin_context_label.sprite.transform.w/2 + 35;
+    ctx.peng_to_sleigh_label.sprite.transform.y = HEIGHT/4 - 15;
 }
 
 // A place to handle queued events.
-static void handle_event(SDL_Event *event)
-{
+static void handle_event(SDL_Event *event){
     switch (event->type)
     {
     case SDL_KEYDOWN:
         // Press space to start!
         if (event->key.keysym.sym == SDLK_SPACE && ctx.current_scene == HOMESCREEN){
             ctx.current_scene = CONTEXT_SCENE;
-            ctx.score = 200;
+            ctx.score = 1;
         }
 
         break;
@@ -144,7 +156,7 @@ static void player_n_enemy_movement(float delta){
     }
 
     // Moving penguins back and forth
-    ng_vec2 left = { 10 , 50 }, right = { WIDTH - 100, 50 };
+    ng_vec2 left = { 20 , 50 }, right = { WIDTH - 100, 50 };
     ng_vec2 left_bound, right_bound;
     float left_threshold, right_threshold, threshold = 30;
 
@@ -199,6 +211,7 @@ static void player_n_enemy_movement(float delta){
 }
 
 static void points_check(){
+    //char temp[20];
     ng_vec2 player_pos = { ctx.player.sprite.transform.x + ctx.player.sprite.transform.w/2, ctx.player.sprite.transform.y + ctx.player.sprite.transform.h/2 };
     ng_vec2 player_present_dist;
     float distance;
@@ -212,6 +225,16 @@ static void points_check(){
         if (distance < 110){
             ctx.score++;
             ctx.presents[i].transform.y += HEIGHT;
+
+            //sprintf(temp, "Score: %d", ctx.score);
+            //printf("%s", temp);
+            //fflush(stdout);
+            //ng_label_set_content(&ctx.score_label, ctx.game.renderer, temp);
+        }
+
+        if (ctx.score >= 2){
+            ctx.current_scene = PENG_TO_SLEIGH;
+            ctx.max_present_countdown = 17;
         }
     }
 }
@@ -225,6 +248,21 @@ static void update_home_to_penguin_scene(){
             ctx.score = 0;
         }
     }
+}
+
+static void update_peng_to_sleigh_scene(){
+    if (ng_interval_is_ready(&ctx.game_tick)){
+        ctx.max_present_countdown--;
+
+        if (ctx.max_present_countdown <= 0){
+            ctx.current_scene = SLEIGH;
+            ctx.max_present_countdown = 0;
+        }
+    }
+}
+
+static void update_sleigh_scene(){
+    return;
 }
 
 static void render_home_scene(){
@@ -247,7 +285,15 @@ static void render_penguin_scene(){
 
         ng_sprite_render(&ctx.presents[i], ctx.game.renderer);
     }
-    ng_sprite_render(&ctx.score_label.sprite, ctx.game.renderer);
+    //ng_sprite_render(&ctx.score_label.sprite, ctx.game.renderer);
+}
+
+static void render_peng_to_sleigh_scene(){
+    ng_sprite_render(&ctx.peng_to_sleigh_label.sprite, ctx.game.renderer);
+}
+
+static void render_sleigh_scene(){
+    ng_sprite_render(&ctx.home_bg, ctx.game.renderer);
 }
 
 static void update_correct_screen(float delta){
@@ -260,7 +306,15 @@ static void update_correct_screen(float delta){
     case PENGUIN_CHASE:
         player_n_enemy_movement(delta);
         points_check();
-        break; 
+        break;
+    case PENG_TO_SLEIGH:
+        update_peng_to_sleigh_scene();
+        break;
+    case SLEIGH:
+        update_sleigh_scene();
+        break;
+    case WIN:
+    case LOSE:
     default:
         break;
     }  
@@ -277,6 +331,14 @@ static void render_correct_screen(){
     case PENGUIN_CHASE:
         render_penguin_scene();
         break;
+    case PENG_TO_SLEIGH:
+        render_peng_to_sleigh_scene();
+        break;
+    case SLEIGH:
+        render_sleigh_scene();
+        break;
+    case WIN:
+    case LOSE:
     default:
         break;
     }    

@@ -102,7 +102,7 @@ void ng_game_start_loop(ng_game_t *game, event_handler_t ev, render_handler_t re
 
 #ifdef __EMSCRIPTEN__
     // If we're running on the web, we need to wrap around emscripten
-    emscripten_set_main_loop_arg(main_game_loop, game, FPS, true);
+    emscripten_set_main_loop_arg(main_game_loop, game, 0, true);
 #else
     for (;;) main_game_loop(game);
 #endif
