@@ -171,7 +171,7 @@ static void create_actors(void){
 }
 
 static void prepare_peng_scene(){
-    ctx.countdown = 20;
+    ctx.countdown = 180 - 65*ctx.repetition_count;
     ctx.max_present_countdown = 30;
     ctx.player.sprite.transform.x = (WIDTH - ctx.player.sprite.transform.w - 10)/2;
     ctx.player.sprite.transform.y = HEIGHT - ctx.player.sprite.transform.h - 30;
@@ -179,8 +179,12 @@ static void prepare_peng_scene(){
     for (size_t i = 0; i < 3; i++){
         ctx.penguins[i].sprite.transform.x = (WIDTH - ctx.penguins[i].sprite.transform.w - 10) / 3.0 * (i) + 50;
         ctx.penguins[i].sprite.transform.y = 55;
-        ng_animated_set_frame(&ctx.penguins[i], pow(-1, i));
+        ctx.penguin_velocity[i] = pow(-1, i) * 120 * (i+1);
     }
+    ng_animated_set_frame(&ctx.penguins[0], 0);
+    ng_animated_set_frame(&ctx.penguins[1], 1);
+    ng_animated_set_frame(&ctx.penguins[2], 0);
+
     ctx.score = 0;
     ng_animated_set_frame(&ctx.player, 0);
 }
@@ -212,8 +216,11 @@ static void prepare_reversal_screen(){
 }
 
 static void prepare_final_cutscene(){
-    ctx.countdown = 0;
+    ctx.countdown = -15;
     ctx.player.sprite.transform.x = 200;
+
+    ng_sprite_create(&ctx.sleigh_bg, ctx.sleigh_bg_texture);
+    ng_sprite_set_scale(&ctx.sleigh_bg, 5.0f);
 
     ng_label_set_content(&ctx.talk_label, ctx.game.renderer, "It was all a dream?");
     ng_sprite_set_scale(&ctx.talk_label.sprite, 2.0f);
@@ -351,7 +358,7 @@ static void points_check(){
             ctx.presents[i].transform.y += HEIGHT;
         }
 
-        if (ctx.score >= 1){
+        if (ctx.score >= 20 - 6*ctx.repetition_count){
             ctx.current_scene = PENG_TO_SLEIGH;
             prepare_sleigh_scene();
         }
@@ -461,6 +468,7 @@ static void update_sleigh_scene(float delta){
         }
         if (ctx.repetition_count >= 3){
             ctx.current_scene = FINAL_CUTSCENE;
+            prepare_final_cutscene();
             return;
         }
     }
@@ -618,6 +626,7 @@ static void update_final_cutscene(float delta){
 }
 
 static void render_final_cutscene(){
+    if (ctx.countdown <= 0) return;
     if (ctx.countdown < 150){
         ng_sprite_render(&ctx.final_bg, ctx.game.renderer);
         if (ctx.countdown > 60 && ctx.countdown < 110) ng_sprite_render(&ctx.talk_label.sprite, ctx.game.renderer);
