@@ -25,12 +25,18 @@ static struct
     // Ideally, they should have been automatically loaded
     // by iterating over the res/ folder and filling in a hastable
     SDL_Texture *player_texture, *penguin_texture, *present_texture, *home_bg_texture, *penguin_bg1_texture, *penguin_bg2_texture, 
-                *penguin_bg3_texture, *sleigh_bg_texture, *sleigh_bg_2_texture, *sleigh_texture, *final_bg1_texture, *final_bg2_texture, *final_bg3_texture;
+                *penguin_bg3_texture, *sleigh_bg_texture, *sleigh_bg_2_texture, *sleigh_texture, *final_bg1_texture, *final_bg2_texture, 
+                *final_bg3_texture, *questionmark_texture;
     TTF_Font *main_font;
+
+    Mix_Chunk *switch_sound;
 
     Scene current_scene;
     ng_label_t welcome_label;
     ng_sprite_t home_bg;
+    ng_sprite_t questionmark;
+    ng_label_t help_label;
+    bool show_help;
     ng_label_t penguin_context_label;
 
     ng_sprite_t penguin_bg;
@@ -63,10 +69,14 @@ static struct
 
     ng_sprite_t final_bg;
     ng_label_t talk_label;
+    Mix_Chunk *final_audio;
 } ctx;
 
 static void create_actors(void){
     ng_game_create(&ctx.game, "DISASTER BEFORE CHRISTMAS", WIDTH, HEIGHT);
+
+    ctx.switch_sound = ng_audio_load("res/154953__keykrusher__microwave-beep.wav");
+    ctx.switch_sound = ng_audio_load("res/final_ms2.wav");
 
     ctx.main_font = TTF_OpenFont("res/free_mono.ttf", 16);
     ctx.player_texture = IMG_LoadTexture(ctx.game.renderer, "res/elf_sprite.png");
@@ -82,6 +92,7 @@ static void create_actors(void){
     ctx.final_bg1_texture = IMG_LoadTexture(ctx.game.renderer, "res/final_bg1.png");
     ctx.final_bg2_texture = IMG_LoadTexture(ctx.game.renderer, "res/final_bg2.png");
     ctx.final_bg3_texture = IMG_LoadTexture(ctx.game.renderer, "res/final_bg3.png");
+    ctx.questionmark_texture = IMG_LoadTexture(ctx.game.renderer, "res/questionmark.png");
 
     ng_interval_create(&ctx.game_tick, 50);
 
@@ -95,6 +106,12 @@ static void create_actors(void){
     ng_sprite_create(&ctx.home_bg, ctx.home_bg_texture);
     ng_sprite_set_scale(&ctx.home_bg, 2.9f);
     ctx.home_bg.transform.x = -200;
+
+    ng_sprite_create(&ctx.questionmark, ctx.questionmark_texture);
+    ng_sprite_set_scale(&ctx.questionmark, 2.9f);
+    ctx.questionmark.transform.x = WIDTH - 100;
+    ctx.questionmark.transform.y = 20;
+    ctx.show_help = false;
 
     ng_sprite_create(&ctx.penguin_bg, ctx.penguin_bg1_texture);
     ng_sprite_set_scale(&ctx.penguin_bg, 5.0f);
@@ -142,6 +159,12 @@ static void create_actors(void){
     ctx.welcome_label.sprite.transform.x = WIDTH/2 - ctx.welcome_label.sprite.transform.w/2 + 110;
     ctx.welcome_label.sprite.transform.y = HEIGHT/4 - 15;
 
+    ng_label_create(&ctx.help_label, ctx.main_font, 300);
+    ng_label_set_content(&ctx.help_label, ctx.game.renderer, "Move: Arrow Keys\nJump: Space");
+    //ng_sprite_set_scale(&ctx.help_label.sprite, 2.0f);
+    ctx.help_label.sprite.transform.x = WIDTH - 170;
+    ctx.help_label.sprite.transform.y = 140;
+
     ng_label_create(&ctx.penguin_context_label, ctx.main_font, 400);
     ng_label_set_content(&ctx.penguin_context_label, ctx.game.renderer, "You are a hard working elf\nlike no other, but at\n"
                                                                         "Christmas Eve, some pesky\npenguins stole Santa's presents.\n\n"
@@ -171,6 +194,7 @@ static void create_actors(void){
 }
 
 static void prepare_peng_scene(){
+    ng_audio_play(ctx.switch_sound);
     ctx.countdown = 180 - 65*ctx.repetition_count;
     ctx.max_present_countdown = 30;
     ctx.player.sprite.transform.x = (WIDTH - ctx.player.sprite.transform.w - 10)/2;
@@ -190,6 +214,7 @@ static void prepare_peng_scene(){
 }
 
 static void prepare_sleigh_scene(){
+    ng_audio_play(ctx.switch_sound);
     ctx.countdown = 17;
     ng_animated_set_frame(&ctx.player, 1);
     ng_animated_set_frame(&ctx.sleigh, 0);
@@ -212,10 +237,12 @@ static void prepare_sleigh_scene(){
 }
 
 static void prepare_reversal_screen(){
+    ng_audio_play(ctx.switch_sound);
     ctx.countdown = 20;
 }
 
 static void prepare_final_cutscene(){
+    ng_audio_play(ctx.switch_sound);
     ctx.countdown = -15;
     ctx.player.sprite.transform.x = 200;
 
@@ -259,6 +286,20 @@ static void handle_event(SDL_Event *event){
         // By the way, that's how you can implement a custom cursor
         //ctx.aaa.sprite.transform.x = event->motion.x;
         //ctx.aaa.sprite.transform.y = event->motion.y;
+        if (ctx.current_scene != HOMESCREEN) break;
+        
+        ng_vec2 mouse_pos = { event->motion.x, event->motion.y };
+        ng_vec2 q_pos = { ctx.questionmark.transform.x + ctx.questionmark.transform.w/2, ctx.questionmark.transform.y + ctx.questionmark.transform.h/2 };
+        ng_vec2 sub;
+        ng_vectors_substract(&sub, &q_pos, &mouse_pos);
+        float distance = ng_vector_get_magnitude(&sub);
+        if (distance < 40){
+            ctx.show_help = true;
+        }
+
+        if (distance > 40){
+            ctx.show_help = false;
+        }
         break;
     }
 }
@@ -518,6 +559,8 @@ static void update_reversal_scene(){
 static void render_home_scene(){
     ng_sprite_render(&ctx.home_bg, ctx.game.renderer);
     ng_sprite_render(&ctx.welcome_label.sprite, ctx.game.renderer);
+    ng_sprite_render(&ctx.questionmark, ctx.game.renderer);
+    if (ctx.show_help) ng_sprite_render(&ctx.help_label.sprite, ctx.game.renderer);
 }
 
 static void render_home_to_penguin_scene(){
@@ -565,6 +608,10 @@ static void render_reversal_scene(){
 static void update_final_cutscene(float delta){
     if (ng_interval_is_ready(&ctx.game_tick)){
         ctx.countdown++;
+        if (ctx.countdown == 14) ng_audio_play(ctx.switch_sound);
+
+        if (ctx.countdown == 0) ng_audio_play(ctx.final_audio);
+        
         if (ctx.countdown == 20){
             ng_sprite_create(&ctx.final_bg, ctx.final_bg2_texture);
             ng_sprite_set_scale(&ctx.final_bg, 10.0f);
