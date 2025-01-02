@@ -69,14 +69,15 @@ static struct
 
     ng_sprite_t final_bg;
     ng_label_t talk_label;
-    Mix_Chunk *final_audio;
+    Mix_Music *final_audio;
 } ctx;
 
 static void create_actors(void){
     ng_game_create(&ctx.game, "DISASTER BEFORE CHRISTMAS", WIDTH, HEIGHT);
 
     ctx.switch_sound = ng_audio_load("res/154953__keykrusher__microwave-beep.wav");
-    ctx.switch_sound = ng_audio_load("res/final_ms2.wav");
+    ctx.final_audio = Mix_LoadMUS("res/final_ms3.wav");
+    if (!ctx.final_audio) ng_die("Something went wrong, couldn't load audio file final_ms2!");
 
     ctx.main_font = TTF_OpenFont("res/free_mono.ttf", 16);
     ctx.player_texture = IMG_LoadTexture(ctx.game.renderer, "res/elf_sprite.png");
@@ -161,7 +162,6 @@ static void create_actors(void){
 
     ng_label_create(&ctx.help_label, ctx.main_font, 300);
     ng_label_set_content(&ctx.help_label, ctx.game.renderer, "Move: Arrow Keys\nJump: Space");
-    //ng_sprite_set_scale(&ctx.help_label.sprite, 2.0f);
     ctx.help_label.sprite.transform.x = WIDTH - 170;
     ctx.help_label.sprite.transform.y = 140;
 
@@ -278,6 +278,7 @@ static void handle_event(SDL_Event *event){
         if (event->key.keysym.sym == SDLK_SPACE && ctx.current_scene == HOMESCREEN){
             ctx.current_scene = CONTEXT_SCENE;
             prepare_peng_scene();
+            //prepare_final_cutscene();
         }
 
         break;
@@ -608,9 +609,7 @@ static void render_reversal_scene(){
 static void update_final_cutscene(float delta){
     if (ng_interval_is_ready(&ctx.game_tick)){
         ctx.countdown++;
-        if (ctx.countdown == 14) ng_audio_play(ctx.switch_sound);
-
-        if (ctx.countdown == 0) ng_audio_play(ctx.final_audio);
+        if (ctx.countdown == 0) Mix_PlayMusic(ctx.final_audio, 1);
         
         if (ctx.countdown == 20){
             ng_sprite_create(&ctx.final_bg, ctx.final_bg2_texture);

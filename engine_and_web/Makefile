@@ -26,7 +26,7 @@ $(OBJ_DIR)/%.o: %.c
 	@# All object files will be placed on a special, isolated directory
 	@mkdir -p $(dir $@)
 
-	$(CC) -D NO_AUDIO -c $< -o $@
+	$(CC) -c $< -o $@
 
 clean:
 	rm -rf $(OBJ_DIR)
