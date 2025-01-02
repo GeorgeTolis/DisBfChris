@@ -14,7 +14,7 @@
 #define PRESENT_V 120
 #define MAX_VERT_V 960
 
-typedef enum { HOMESCREEN, CONTEXT_SCENE, PENGUIN_CHASE, PENG_TO_SLEIGH, SLEIGH, WIN, LOSE } Scene;
+typedef enum { HOMESCREEN, CONTEXT_SCENE, PENGUIN_CHASE, PENG_TO_SLEIGH, SLEIGH, BLACK_SCREEN, WAKE_UP, EHH, FINAL_CUSCENE, WIN, LOSE } Scene;
 
 static struct
 {
@@ -24,7 +24,7 @@ static struct
     // A collection of assets used by entities
     // Ideally, they should have been automatically loaded
     // by iterating over the res/ folder and filling in a hastable
-    SDL_Texture *player_texture, *penguin_texture, *present_texture, *home_bg_texture, *penguin_bg_texture, *sleigh_bg_texture, *sleigh_texture;
+    SDL_Texture *player_texture, *penguin_texture, *present_texture, *home_bg_texture, *penguin_bg1_texture, *penguin_bg2_texture, *penguin_bg3_texture, *sleigh_bg_texture, *sleigh_bg_2_texture, *sleigh_texture;
     TTF_Font *main_font;
 
     Scene current_scene;
@@ -51,10 +51,14 @@ static struct
     ng_animated_sprite_t sleigh;
     bool carrying_present;
     short unsigned int top_present;
-    int santa_countdown;
+    int countdown;
     int vertical_velocity;
     bool is_jumping;
     int floor;
+
+    unsigned int repetition_count;
+    ng_label_t ehh_label;
+    ng_label_t wake_up_label;
 } ctx;
 
 static void create_actors(void){
@@ -65,8 +69,11 @@ static void create_actors(void){
     ctx.penguin_texture = IMG_LoadTexture(ctx.game.renderer, "res/penquin.png");
     ctx.present_texture = IMG_LoadTexture(ctx.game.renderer, "res/present.png");
     ctx.home_bg_texture = IMG_LoadTexture(ctx.game.renderer, "res/home_background.png");
-    ctx.penguin_bg_texture = IMG_LoadTexture(ctx.game.renderer, "res/penguin_background.png");
+    ctx.penguin_bg1_texture = IMG_LoadTexture(ctx.game.renderer, "res/penguin_bg1.png");
+    ctx.penguin_bg2_texture = IMG_LoadTexture(ctx.game.renderer, "res/penguin_bg2.png");
+    ctx.penguin_bg3_texture = IMG_LoadTexture(ctx.game.renderer, "res/penguin_bg3.png");
     ctx.sleigh_bg_texture = IMG_LoadTexture(ctx.game.renderer, "res/slay_bg.png");
+    ctx.sleigh_bg_2_texture = IMG_LoadTexture(ctx.game.renderer, "res/slay_bg_2.png");
     ctx.sleigh_texture = IMG_LoadTexture(ctx.game.renderer, "res/slay_sprite.png");
 
     ng_interval_create(&ctx.game_tick, 50);
@@ -76,12 +83,13 @@ static void create_actors(void){
     ctx.top_present = 9;
     ctx.vertical_velocity = 0;
     ctx.is_jumping = false;
+    ctx.repetition_count = 0;
 
     ng_sprite_create(&ctx.home_bg, ctx.home_bg_texture);
     ng_sprite_set_scale(&ctx.home_bg, 2.9f);
     ctx.home_bg.transform.x = -200;
 
-    ng_sprite_create(&ctx.penguin_bg, ctx.penguin_bg_texture);
+    ng_sprite_create(&ctx.penguin_bg, ctx.penguin_bg1_texture);
     ng_sprite_set_scale(&ctx.penguin_bg, 5.0f);
 
     ng_sprite_create(&ctx.sleigh_bg, ctx.sleigh_bg_texture);
@@ -131,16 +139,66 @@ static void create_actors(void){
     ctx.penguin_context_label.sprite.transform.x = WIDTH/2 - ctx.penguin_context_label.sprite.transform.w/2 + 35;
     ctx.penguin_context_label.sprite.transform.y = HEIGHT/4 - 15;
 
-    ng_label_create(&ctx.score_label, ctx.main_font, 300);
-    ng_label_set_content(&ctx.score_label, ctx.game.renderer, "SCORE: 0");
-    ctx.score_label.sprite.transform.x = 10;
-    ctx.score_label.sprite.transform.y = 150;
-
     ng_label_create(&ctx.peng_to_sleigh_label, ctx.main_font, 300);
     ng_label_set_content(&ctx.peng_to_sleigh_label, ctx.game.renderer, "LOAD THE PRESENTS");
     ng_sprite_set_scale(&ctx.peng_to_sleigh_label.sprite, 4.0f);
     ctx.peng_to_sleigh_label.sprite.transform.x = WIDTH/2 - ctx.peng_to_sleigh_label.sprite.transform.w/2 + 35;
     ctx.peng_to_sleigh_label.sprite.transform.y = HEIGHT/2 - ctx.peng_to_sleigh_label.sprite.transform.h/2;
+
+    ng_label_create(&ctx.ehh_label, ctx.main_font, 300);
+    ng_label_set_content(&ctx.ehh_label, ctx.game.renderer, "EHHHHHH");
+    ng_sprite_set_scale(&ctx.ehh_label.sprite, 4.0f);
+    ctx.ehh_label.sprite.transform.x = WIDTH/2 - ctx.ehh_label.sprite.transform.w/2 + 35;
+    ctx.ehh_label.sprite.transform.y = HEIGHT/2 - ctx.ehh_label.sprite.transform.h/2;
+
+    ng_label_create(&ctx.wake_up_label, ctx.main_font, 300);
+    ng_label_set_content(&ctx.wake_up_label, ctx.game.renderer, "WAKE UP");
+    ng_sprite_set_scale(&ctx.wake_up_label.sprite, 4.0f);
+    ctx.wake_up_label.sprite.transform.x = WIDTH/2 - ctx.wake_up_label.sprite.transform.w/2 + 35;
+    ctx.wake_up_label.sprite.transform.y = HEIGHT/2 - ctx.wake_up_label.sprite.transform.h/2;
+}
+
+static void prepare_peng_scene(){
+    ctx.countdown = 20;
+    ctx.max_present_countdown = 30;
+    ctx.player.sprite.transform.x = (WIDTH - ctx.player.sprite.transform.w - 10)/2;
+    ctx.player.sprite.transform.y = HEIGHT - ctx.player.sprite.transform.h - 30;
+    ctx.floor = ctx.player.sprite.transform.y;
+    for (size_t i = 0; i < 3; i++){
+        ctx.penguins[i].sprite.transform.x = (WIDTH - ctx.penguins[i].sprite.transform.w - 10) / 3.0 * (i) + 50;
+        ctx.penguins[i].sprite.transform.y = 55;
+    }
+    ng_animated_set_frame(&ctx.penguins[0], 0);
+    ng_animated_set_frame(&ctx.penguins[1], 1);
+    ng_animated_set_frame(&ctx.penguins[2], 0);
+    ctx.score = 0;
+    ng_animated_set_frame(&ctx.player, 0);
+}
+
+static void prepare_sleigh_scene(){
+    ctx.countdown = 17;
+    ng_animated_set_frame(&ctx.player, 1);
+    ng_animated_set_frame(&ctx.sleigh, 0);
+
+    ctx.player.sprite.transform.x = WIDTH - 300;
+    ctx.player.sprite.transform.y = ctx.sleigh.sprite.transform.y + ctx.player.sprite.transform.h - 15;
+    ctx.floor = ctx.player.sprite.transform.y;
+
+    ctx.top_present = 9 - 2*ctx.repetition_count;
+
+    for (size_t i = 0; i < ctx.top_present; i++){
+        ctx.presents[i].transform.x = ctx.player.sprite.transform.x + 50;
+        ctx.presents[i].transform.y = ctx.player.sprite.transform.y + ctx.presents[i].transform.h/2 + 10 - i * ctx.presents[i].transform.h / 2;
+    }
+
+    for (size_t i = ctx.top_present; i < 10; i++){
+        ctx.presents[i].transform.x = -100;
+        ctx.presents[i].transform.y = -100;
+    }
+}
+
+static void prepare_reversal_screen(){
+    ctx.countdown = 20;
 }
 
 // A place to handle queued events.
@@ -151,7 +209,7 @@ static void handle_event(SDL_Event *event){
         // Press space to start!
         if (event->key.keysym.sym == SDLK_SPACE && ctx.current_scene == HOMESCREEN){
             ctx.current_scene = CONTEXT_SCENE;
-            ctx.score = 1;
+            prepare_peng_scene();
         }
 
         break;
@@ -261,26 +319,16 @@ static void points_check(){
 
         if (ctx.score >= 1){
             ctx.current_scene = PENG_TO_SLEIGH;
-            ctx.max_present_countdown = 17;
-            ng_animated_set_frame(&ctx.player, 1);
-
-            ctx.player.sprite.transform.x = WIDTH - 300;
-            ctx.player.sprite.transform.y = ctx.sleigh.sprite.transform.y + ctx.player.sprite.transform.h - 15;
-            ctx.floor = ctx.player.sprite.transform.y;
-
-            for (i = 0; i < 10; i++){
-                ctx.presents[i].transform.x = ctx.player.sprite.transform.x + 50;
-                ctx.presents[i].transform.y = ctx.player.sprite.transform.y + ctx.presents[i].transform.h/2 + 10 - i * ctx.presents[i].transform.h / 2;
-            }
+            prepare_sleigh_scene();
         }
     }
 }
 
 static void update_home_to_penguin_scene(){
     if (ng_interval_is_ready(&ctx.game_tick)){
-        ctx.score--;
+        ctx.countdown--;
 
-        if (ctx.score <= 0){
+        if (ctx.countdown <= 0){
             ctx.current_scene = PENGUIN_CHASE;
             ctx.score = 0;
         }
@@ -289,12 +337,42 @@ static void update_home_to_penguin_scene(){
 
 static void update_peng_to_sleigh_scene(){
     if (ng_interval_is_ready(&ctx.game_tick)){
-        ctx.max_present_countdown--;
+        ctx.countdown--;
 
-        if (ctx.max_present_countdown <= 0){
+        if (ctx.countdown <= 0){
             ctx.current_scene = SLEIGH;
-            ctx.max_present_countdown = 0;
+            ctx.countdown = 0;
         }
+    }
+}
+
+static void update_slay(){
+    switch (ctx.repetition_count){
+    case 0:
+        if (ctx.top_present == 8 || ctx.top_present == 5 || ctx.top_present == 1){
+            ng_animated_set_frame(&ctx.sleigh, (ctx.sleigh.frame + 1) % ctx.sleigh.total_frames);
+        }
+        break;
+    case 1:
+        if (ctx.top_present == 6 || ctx.top_present == 3 || ctx.top_present == 1){
+            ng_animated_set_frame(&ctx.sleigh, (ctx.sleigh.frame + 1) % ctx.sleigh.total_frames);
+        }
+        break;
+    case 2:
+        if (ctx.top_present == 4 || ctx.top_present == 2 || ctx.top_present == 0){
+            ng_animated_set_frame(&ctx.sleigh, (ctx.sleigh.frame + 1) % ctx.sleigh.total_frames);
+        }
+        break;
+    case 3:
+        if (ctx.top_present == 2){
+            ng_animated_set_frame(&ctx.sleigh, (ctx.sleigh.frame + 2) % ctx.sleigh.total_frames);
+        }
+        if (ctx.top_present == 1 || ctx.top_present == 0){
+            ng_animated_set_frame(&ctx.sleigh, (ctx.sleigh.frame - 1) % ctx.sleigh.total_frames);
+        }
+        break;
+    default:
+        break;
     }
 }
 
@@ -323,14 +401,34 @@ static void update_sleigh_scene(float delta){
         }
     }
 
-    //ctx.sleigh.sprite.transform.y + ctx.player.sprite.transform.h - 15
-
     if (ctx.carrying_present){
         ng_animated_set_frame(&ctx.player, 0);
     }
 
     if (ctx.presents[0].transform.x < 0 && !ctx.carrying_present){
-        ctx.current_scene = WIN;
+        prepare_reversal_screen();
+        if (ctx.repetition_count == 0){
+            ctx.current_scene = BLACK_SCREEN;
+            return;
+        }
+        if (ctx.repetition_count == 1){
+            ctx.current_scene = EHH;
+            ng_sprite_create(&ctx.penguin_bg, ctx.penguin_bg2_texture);
+            ng_sprite_set_scale(&ctx.penguin_bg, 5.0f);
+            return;
+        }
+        if (ctx.repetition_count == 2){
+            ctx.current_scene = WAKE_UP;
+            ng_sprite_create(&ctx.penguin_bg, ctx.penguin_bg3_texture);
+            ng_sprite_set_scale(&ctx.penguin_bg, 5.0f);
+            ng_sprite_create(&ctx.sleigh_bg, ctx.sleigh_bg_2_texture);
+            ng_sprite_set_scale(&ctx.sleigh_bg, 5.0f);
+            return;
+        }
+        if (ctx.repetition_count >= 3){
+            ctx.current_scene = FINAL_CUSCENE;
+            return;
+        }
     }
 
     ng_vec2 player_pos = { ctx.player.sprite.transform.x + ctx.player.sprite.transform.w/2, ctx.player.sprite.transform.y + ctx.player.sprite.transform.h/2 };
@@ -350,11 +448,27 @@ static void update_sleigh_scene(float delta){
     ng_vectors_substract(&player_target_dist, &player_pos, &sleigh_pos);
     distance = ng_vector_get_magnitude(&player_target_dist);
     if (distance < 80 && ctx.carrying_present){
-        if (ctx.top_present == 8 || ctx.top_present == 5 || ctx.top_present == 1){
-            ng_animated_set_frame(&ctx.sleigh, (ctx.sleigh.frame + 1) % ctx.sleigh.total_frames);
-        }
+        update_slay();
 
         ctx.carrying_present = false;
+    }
+}
+
+static void update_reversal_scene(){
+    if (ng_interval_is_ready(&ctx.game_tick)){
+        ctx.countdown--;
+
+        if (ctx.countdown <= 0){
+            if (ctx.repetition_count < 4){
+                ctx.current_scene = CONTEXT_SCENE;
+                prepare_peng_scene();
+                ctx.repetition_count++;
+                return;
+            }
+
+            ctx.current_scene = WIN;
+            ctx.repetition_count++;
+        }
     }
 }
 
@@ -394,6 +508,17 @@ static void render_sleigh_scene(){
     ng_sprite_render(&ctx.player.sprite, ctx.game.renderer);
 }
 
+static void render_reversal_scene(){
+    if (ctx.current_scene == EHH){
+        ng_sprite_render(&ctx.ehh_label.sprite, ctx.game.renderer);
+        return;
+    }
+    if (ctx.current_scene == WAKE_UP){
+        ng_sprite_render(&ctx.wake_up_label.sprite, ctx.game.renderer);
+        return;
+    }
+}
+
 static void update_correct_screen(float delta){
     switch (ctx.current_scene){
     case HOMESCREEN:
@@ -410,6 +535,11 @@ static void update_correct_screen(float delta){
         break;
     case SLEIGH:
         update_sleigh_scene(delta);
+        break;
+    case BLACK_SCREEN:
+    case EHH:
+    case WAKE_UP:
+        update_reversal_scene();
         break;
     case WIN:
     case LOSE:
@@ -434,6 +564,14 @@ static void render_correct_screen(){
         break;
     case SLEIGH:
         render_sleigh_scene();
+        break;
+    case BLACK_SCREEN:
+        break;
+    case EHH:
+        render_reversal_scene();
+        break;
+    case WAKE_UP:
+        render_reversal_scene();
         break;
     case WIN:
     case LOSE:
