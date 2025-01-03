@@ -194,7 +194,7 @@ static void create_actors(void){
 }
 
 static void prepare_peng_scene(){
-    ng_audio_play(ctx.switch_sound);
+    Mix_PlayChannel(-1, ctx.switch_sound, 0);
     ctx.countdown = 180 - 65*ctx.repetition_count;
     ctx.max_present_countdown = 30;
     ctx.player.sprite.transform.x = (WIDTH - ctx.player.sprite.transform.w - 10)/2;
@@ -214,7 +214,7 @@ static void prepare_peng_scene(){
 }
 
 static void prepare_sleigh_scene(){
-    ng_audio_play(ctx.switch_sound);
+    Mix_PlayChannel(-1, ctx.switch_sound, 0);
     ctx.countdown = 17;
     ng_animated_set_frame(&ctx.player, 1);
     ng_animated_set_frame(&ctx.sleigh, 0);
@@ -237,12 +237,12 @@ static void prepare_sleigh_scene(){
 }
 
 static void prepare_reversal_screen(){
-    ng_audio_play(ctx.switch_sound);
+    Mix_PlayChannel(-1, ctx.switch_sound, 0);
     ctx.countdown = 20;
 }
 
 static void prepare_final_cutscene(){
-    ng_audio_play(ctx.switch_sound);
+    Mix_PlayChannel(-1, ctx.switch_sound, 0);
     ctx.countdown = -15;
     ctx.player.sprite.transform.x = 200;
 
@@ -278,7 +278,6 @@ static void handle_event(SDL_Event *event){
         if (event->key.keysym.sym == SDLK_SPACE && ctx.current_scene == HOMESCREEN){
             ctx.current_scene = CONTEXT_SCENE;
             prepare_peng_scene();
-            //prepare_final_cutscene();
         }
 
         break;
@@ -447,11 +446,8 @@ static void update_slay(){
         }
         break;
     case 3:
-        if (ctx.top_present == 2){
-            ng_animated_set_frame(&ctx.sleigh, (ctx.sleigh.frame + 2) % ctx.sleigh.total_frames);
-        }
-        if (ctx.top_present == 1 || ctx.top_present == 0){
-            ng_animated_set_frame(&ctx.sleigh, (ctx.sleigh.frame - 1) % ctx.sleigh.total_frames);
+        if (ctx.top_present == 2 || ctx.top_present == 1 || ctx.top_present == 0){
+            ng_animated_set_frame(&ctx.sleigh, (ctx.sleigh.frame + 1) % ctx.sleigh.total_frames);
         }
         break;
     default:
@@ -506,6 +502,10 @@ static void update_sleigh_scene(float delta){
             ng_sprite_set_scale(&ctx.penguin_bg, 5.0f);
             ng_sprite_create(&ctx.sleigh_bg, ctx.sleigh_bg_2_texture);
             ng_sprite_set_scale(&ctx.sleigh_bg, 5.0f);
+            ng_label_set_content(&ctx.peng_to_sleigh_label, ctx.game.renderer, "HE IS WATCHING");
+            ng_sprite_set_scale(&ctx.peng_to_sleigh_label.sprite, 4.0f);
+            ctx.peng_to_sleigh_label.sprite.transform.x = WIDTH/2 - ctx.peng_to_sleigh_label.sprite.transform.w/2 + 35;
+            ctx.peng_to_sleigh_label.sprite.transform.y = HEIGHT/2 - ctx.peng_to_sleigh_label.sprite.transform.h/2;
             return;
         }
         if (ctx.repetition_count >= 3){
@@ -643,13 +643,14 @@ static void update_final_cutscene(float delta){
             return;
         }
 
+        if (ctx.countdown == 221) Mix_PauseMusic();
+
         for (size_t i = 0; i <= 1; i++){
             if (ctx.penguins[i].sprite.transform.x < 200 || ctx.penguins[i].sprite.transform.x > 300){
                 ng_animated_set_frame(&ctx.penguins[i], (ctx.penguins[i].frame + 1) % ctx.penguins[i].total_frames);
             } 
 
             ctx.penguins[i].sprite.transform.x += 400 * pow(-1, ctx.penguins[i].frame) * delta;
-
         }    
 
         if (ctx.countdown > 220 && ctx.countdown < 240) {
@@ -663,6 +664,7 @@ static void update_final_cutscene(float delta){
             return;
         }
         if(ctx.countdown == 321){
+            Mix_ResumeMusic();
             ng_label_set_content(&ctx.talk_label, ctx.game.renderer, "THE END");
             ng_sprite_set_scale(&ctx.talk_label.sprite, 4.0f);
             ctx.talk_label.sprite.transform.x = WIDTH/2;
